@@ -16,6 +16,7 @@ print(SERVER)
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind(ADDR)
+mutex = threading.Lock()
 
 
 def send_message(conn, msg):
@@ -28,6 +29,7 @@ def send_message(conn, msg):
 
 
 def handle_client(conn, addr):
+    global connected
     print("in hc")
     connected = True
 
@@ -50,13 +52,18 @@ def handle_client(conn, addr):
 
     while connected:
         message = get_message(conn)
+        if message == -1:
+            connected = False
+            break
         if message:
             ans = f"<{time.asctime()}> [{clients_list[addr][0]}] {message}"
             print(ans)
+            mutex.acquire()
             for addr in clients_list:
                 if clients_list[addr][1] == 'connected':
                     send_message(clients_list[addr][2], ans)
-
+            mutex.release()
+        connected = clients_list[addr][1]
     conn.close()
 
 
@@ -65,19 +72,24 @@ def disconnect(conn):
         if clients_list[addr][2] == conn:
             clients_list[addr][1] = 'disconnected'
             print(f"[{clients_list[addr][0]}] DISCONNECTED FROM THE SERVER")
+            '''threading.current_thread().join()'''
 
 
 def get_message(conn):
-    msg_length = conn.recv(HEADER).decode(FORMAT)  # Waits til some message will come throw the socket
-    if not msg_length:
-        return ''
-    else:
-        msg_length = int(msg_length)
-        msg = conn.recv(msg_length).decode(FORMAT)
-        if msg.startswith(DISCONNECT_COMMAND):
-            disconnect(conn)
+    try:
+        msg_length = conn.recv(HEADER).decode(FORMAT)  # Waits til some message will come throw the socket
+        if not msg_length:
+            return ''
         else:
-            return msg
+            msg_length = int(msg_length)
+            msg = conn.recv(msg_length).decode(FORMAT)
+            if msg.startswith(DISCONNECT_COMMAND):
+                disconnect(conn)
+            else:
+                return msg
+    except ConnectionResetError:
+        disconnect(conn)
+        return -1
 
 
 def start():
