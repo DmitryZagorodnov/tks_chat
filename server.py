@@ -28,6 +28,7 @@ def send_message(conn, msg):
 
 
 def handle_client(conn, addr):
+    print("in hc")
     connected = True
 
     if addr not in clients_list:
@@ -39,6 +40,8 @@ def handle_client(conn, addr):
     else:
         clients_list[addr][1] = 'connected'
 
+    print("b4 if conn")
+
     if connected:
         print(f"\nNEW CONNECTION: {clients_list[addr][0]} connected", end='\n')
         print(f"THE NUMBER OF CURRENT CONNECTIONS {threading.activeCount() - 1}")
@@ -48,8 +51,8 @@ def handle_client(conn, addr):
     while connected:
         message = get_message(conn)
         if message:
-            print(f"<{time.asctime()}> [{clients_list[addr][0]}] {message}")
             ans = f"<{time.asctime()}> [{clients_list[addr][0]}] {message}"
+            print(ans)
             for addr in clients_list:
                 if clients_list[addr][1] == 'connected':
                     send_message(clients_list[addr][2], ans)

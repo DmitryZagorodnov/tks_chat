@@ -7,7 +7,7 @@ FORMAT = "utf-8"
 HEADER = 64
 PORT = 5050
 DISCONNECT_COMMAND = "!DISCONNECT"
-SERVER = "169.254.22.225"
+SERVER = "192.168.0.5"
 ADDR = (SERVER, PORT)
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -17,13 +17,11 @@ connected = True
 
 def get_message(conn):
     msg_length = conn.recv(HEADER).decode(FORMAT)  # Waits til some message will come throw the socket
-    print(msg_length)
     if not msg_length:
         print('')
     else:
         msg_length = int(msg_length)
         msg = conn.recv(msg_length).decode(FORMAT)
-        print(msg)
 
 
 def send(msg):
@@ -33,13 +31,10 @@ def send(msg):
     send_length += b' ' * (HEADER - len(send_length))
     client.send(send_length)
     client.send(message)
-    if msg != DISCONNECT_COMMAND:
-        print(client.recv(2048).decode(FORMAT))
-    else:
-        print("You are disconnected from the server")
 
 
-input("Write !LOGIN [name] to login the server\n")
+login_message = input("Write !LOGIN [name] to login the server\n")
+send(login_message)
 
 while True:
     try:
