@@ -1,29 +1,18 @@
 import socket
 import threading
 import time
+from commands import Command
+from messages import Message
 
 FORMAT = "utf-8"
-SERVICE_HEADER = 10
-FILE_HEADER = 64
-TYPE_HEADER = 2
-TIME_HEADER = 2
-NICKNAME_HEADER = 2
-MESSAGE_HEADER = 64
+HEADER = 10
+
+SERVER = "192.168.0.107"
 PORT = 5050
-LOGIN_COMMAND = "!LOGIN"
-DISCONNECT_COMMAND = "!DISCONNECT"
-ADD_FILE_COMMAND = "!ATTACH"
-GET_FILE_COMMAND = "!FILE COMES NEXT"
-DISCONNECT_MESSAGE = "!DISCONNECT"
-LOGIN_MESSAGE = "!LOGIN"
-LOGIN_ERROR_MESSAGE = "YOU ARE NOT LOGGED INTO THE SERVER. RERUN THE EXECUTABLE FILE"
-CONNECTION_ENDED_MESSAGE = "YOU ARE DISCONNECTED FROM THE SERVER"
-SERVER = "172.29.192.1"
 ADDR = (SERVER, PORT)
-TIMEZONE = time.timezone
+
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect(ADDR)
-connected = True
 
 
 """
@@ -32,49 +21,47 @@ file to write
 """
 
 
-def get_message(conn, header):
+def get_message(conn):
     try:
-        msg_length = conn.recv(header).decode(FORMAT)  # Waits til some message will come throw the socket
+        msg_length = conn.recv(HEADER).decode(FORMAT)  # Waits til some message will come throw the socket
         msg_length = int(msg_length)
-        try:
-            msg = conn.recv(msg_length).decode(FORMAT)
-        except:
-            msg = conn.recv(msg_length)
-        return msg
+        msg = conn.recv(msg_length)
+        message = msg.decode(FORMAT)
+        return message
     except ConnectionAbortedError:
         return "Rerun the executable file"
-    except ValueError:
-        return "You haven't logged to the server"
-    except ConnectionResetError:
-        return "Server is not available"
+
+
+def get_file(conn):
+    file_length = conn.recv(HEADER).decode(FORMAT)
+    if not file_length:
+        return -1
+    else:
+        file_length = int(file_length)
+        file = b""
+        current_length = 0
+        while current_length < file_length:
+            file += conn.recv(file_length - current_length)
+            current_length = len(file)
+    return file
 
 
 def message_assembly():
     while True:
-        msg_type = get_message(client, TYPE_HEADER)
+        msg_type = get_message(client)
         if msg_type == "usual":
-            t = get_message(client, TIME_HEADER)
-            t = time.strptime(t)
-            t = time.mktime(t)
-            tz = get_message(client, TIME_HEADER)
-            t += int(tz)
-            t -= int(TIMEZONE)
-            t = time.ctime(t)
-            nickname = get_message(client, NICKNAME_HEADER)
-            msg = get_message(client, MESSAGE_HEADER)
-            print(f"<{t}> [{nickname}] {msg}")
+            current_time = time.asctime()
+            nickname = get_message(client)
+            msg = get_message(client)
+            print(f"<{current_time}> [{nickname}] {msg}")
         elif msg_type == "file":
-            name = get_message(client, MESSAGE_HEADER)
-            image = get_message(client, FILE_HEADER)
+            name = get_message(client)
+            image = get_file(client)
             with open(name, 'wb') as file:
                 file.write(image)
-            print(f"You received a file named {name}")
         elif msg_type == "service":
-            msg = get_message(client, SERVICE_HEADER)
-            if msg == LOGIN_ERROR_MESSAGE:
-                print("Rerun the executable file and try to login correctly")
-                break
-            elif msg == CONNECTION_ENDED_MESSAGE:
+            msg = get_message(client)
+            if msg == Message.LOGIN_ERROR_MESSAGE.value or msg == Message.CONNECTION_ENDED_MESSAGE.value:
                 print(msg)
                 break
             else:
@@ -100,7 +87,7 @@ def send(msg):
             message = msg
         msg_length = len(message)
         send_length = str(msg_length).encode(FORMAT)
-        send_length += b' ' * (MESSAGE_HEADER - len(send_length))
+        send_length += b' ' * (HEADER - len(send_length))
         client.send(send_length)
         client.send(message)
     except ConnectionResetError:
@@ -116,14 +103,14 @@ def send_message():
     while True:
         try:
             msg = input()
-            if msg.startswith(LOGIN_COMMAND):
+            if msg.startswith(Command.LOGIN_COMMAND.value):
                 send('service')
-                send(LOGIN_MESSAGE)
-                send(msg.split()[1])
-            elif msg.startswith(DISCONNECT_COMMAND):
+                send(Message.LOGIN_MESSAGE.value)
+                send(msg.split()[len(msg.split())-1])
+            elif msg.startswith(Command.DISCONNECT_COMMAND.value):
                 send('service')
-                send(DISCONNECT_MESSAGE)
-            elif msg.startswith(ADD_FILE_COMMAND):
+                send(Message.DISCONNECT_MESSAGE.value)
+            elif msg.startswith(Command.ADD_FILE_COMMAND.value):
                 path = msg.split()[1]
                 image = attach_file(path)
                 send('file')
@@ -140,7 +127,7 @@ def send_message():
 Starting the threads to get and to send messages
 """
 
-print("Write !LOGIN [name] to login the server")
+print(f"Write {Command.LOGIN_COMMAND.value} [name] to login the server")
 
 while True:
     getting_thread = threading.Thread(target=message_assembly)
