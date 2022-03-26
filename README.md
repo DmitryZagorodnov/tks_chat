@@ -28,6 +28,7 @@ HEADER'а - 10 байт, при меньшей реальной длине он 
 | HEADER | message_body |  
 |:--------:|:--------------:|  
 |10 bytes|From 0 to 9999999999 bytes*|  
+
 *in encoded form 
 
 ## Отправка сообщений
